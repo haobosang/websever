@@ -23,7 +23,7 @@ void errif(bool flag,const char * msg){
     return ;
 }
 int main(){
-    char buf[20];
+    char buf[1024];
     int socketfd = socket(AF_INET,SOCK_STREAM,0);
     errif(socketfd==-1,"socket create error"); 
     
@@ -35,18 +35,32 @@ int main(){
     bind(socketfd,(sockaddr *)&sever_addr,sizeof(sever_addr));
     
     listen(socketfd,MAXCONN);
+    bzero(&cli_addr,sizeof(cli_addr));
+    socklen_t cli_addr_len = sizeof(cli_addr);
+    int connectfd=accept(socketfd,(sockaddr *)&cli_addr,&cli_addr_len);
+    errif(connectfd==-1,"accept error\n");
     while(1)
     {
-        bzero(&cli_addr,sizeof(cli_addr));
-        socklen_t cli_addr_len = sizeof(cli_addr);
-        int connectfd=accept(socketfd,(sockaddr *)&cli_addr,&cli_addr_len);
-        int n=read(connectfd,buf,20);
-        for(int i=0;i<n;i++){
-            buf[i]=toupper(buf[i]);
+        bzero(&buf,sizeof(buf));
+        int n=read(connectfd,buf,1024);
+        if(n>0)
+        {
+            printf("msg send by client: %s",buf);
+            for(int i=0;i<n;i++){
+                buf[i]=toupper(buf[i]);
+            }
+            write(connectfd,buf,n);
+        }else if(n==0)
+        {
+            printf("read disconnect\n");
+            close(connectfd);
+        }else{
+            close(connectfd);
+            errif(true,"socket read error\n");
         }
-        write(connectfd,buf,n);
-        close(connectfd);
     }
+    close(connectfd);
+
 
     return 0;
 }
