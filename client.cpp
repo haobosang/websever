@@ -18,8 +18,10 @@ int main(){
     cli_addr.sin_family = AF_INET;
     cli_addr.sin_port = htons(7777);
     cli_addr.sin_addr.s_addr = inet_addr("127.0.0.1");
-    int confd=connect(sockefd,(sockaddr *)&cli_addr,sizeof(cli_addr));
-    write(confd,"hello\n",6);
-    close(confd);
+    connect(sockefd,(sockaddr *)&cli_addr,sizeof(cli_addr));
+    write(sockefd,"hello\n",6);
+    int n=read(sockefd,buf,20);
+    write(1,buf,n);
+    close(sockefd);
     return 0;
 }
