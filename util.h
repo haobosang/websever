@@ -7,17 +7,7 @@
 
 #ifndef _UTIL_H
 #define _UTIL_H
-
-#define EXIT_FAIL 1
-void errif(bool flag,const char * msg){
+void errif(bool ,const char *);
     
-    if(flag)
-    {
-        perror(msg);
-        exit(EXIT_FAIL);
-    
-    }
-    return ;
-}
 
 #endif

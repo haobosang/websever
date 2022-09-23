@@ -14,6 +14,8 @@
 #include<unistd.h>
 #include<fcntl.h>
 #include"util.h"
+#include"InetAddress.h"
+#include"Socket.h"
 #define MAXLISTEN 128
 #define MAX_EVENTS 128
 using namespace std;
@@ -23,34 +25,30 @@ void setfcntl(int fd){
     fcntl(fd,F_SETFL,newsocketflag);
 }
 int main(){
-    int socketfd = socket(AF_INET,SOCK_STREAM,0);
-    struct sockaddr_in severaddr,cliaddr;
-    bzero(&severaddr,sizeof(severaddr));
-    severaddr.sin_family = AF_INET;
-    severaddr.sin_addr.s_addr = inet_addr("127.0.0.1");
-    severaddr.sin_port = htons(7777);
-    bind(socketfd,(sockaddr *)&severaddr,sizeof(severaddr));
-    listen(socketfd,MAXLISTEN);
-
+    Socket *sever_sock = new Socket();
+    InetAddress *severaddr = new InetAddress("127.0.0.1",7777);
+    sever_sock->bind(severaddr);
+    sever_sock->listen();
+    sever_sock->setnoblock();
     int epfd = epoll_create1(0);
     struct epoll_event events[MAX_EVENTS],ev;
     ev.events = EPOLLIN | EPOLLET;
-    ev.data.fd=socketfd;
-    epoll_ctl(epfd,EPOLL_CTL_ADD,socketfd,&ev);
+    ev.data.fd=sever_sock->getfd();
+    epoll_ctl(epfd,EPOLL_CTL_ADD,sever_sock->getfd(),&ev);
     while(true)
     {
         int nfds = epoll_wait(epfd,events,MAX_EVENTS,-1);
         errif(nfds==-1,"nfd error"); 
         for(int i=0;i<nfds;i++)
         {
-            if(events[i].data.fd == socketfd)
+            if(events[i].data.fd == sever_sock->getfd())
             {
-                socklen_t cliaddr_len = sizeof(cliaddr);
-                int clisocket = accept(socketfd,(sockaddr *)&cliaddr,&cliaddr_len);
-                ev.data.fd = clisocket;
+                InetAddress *cliaddr = new InetAddress();
+                Socket *cli_sock = new Socket(sever_sock->accept(cliaddr));
+                cli_sock->setnoblock();
+                ev.data.fd = cli_sock->getfd();
                 ev.events = EPOLLIN | EPOLLET;
-                setfcntl(clisocket);
-                epoll_ctl(epfd,EPOLL_CTL_ADD,clisocket,&ev);
+                epoll_ctl(epfd,EPOLL_CTL_ADD,cli_sock->getfd(),&ev);
 
             }else if(events[i].events & EPOLLIN){
                 char buf[1024];
@@ -79,6 +77,5 @@ int main(){
             
         }
     }
-    close(socketfd);
     return 0;
 }
