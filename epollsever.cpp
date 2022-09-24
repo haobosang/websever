@@ -16,40 +16,33 @@
 #include"util.h"
 #include"InetAddress.h"
 #include"Socket.h"
+#include"epoll.h"
 #define MAXLISTEN 128
 #define MAX_EVENTS 128
 using namespace std;
-void setfcntl(int fd){
-    int oldsocketflag = fcntl(fd,F_GETFL,0);
-    int newsocketflag = oldsocketflag | O_NONBLOCK;
-    fcntl(fd,F_SETFL,newsocketflag);
-}
 int main(){
     Socket *sever_sock = new Socket();
     InetAddress *severaddr = new InetAddress("127.0.0.1",7777);
     sever_sock->bind(severaddr);
     sever_sock->listen();
     sever_sock->setnoblock();
-    int epfd = epoll_create1(0);
-    struct epoll_event events[MAX_EVENTS],ev;
-    ev.events = EPOLLIN | EPOLLET;
-    ev.data.fd=sever_sock->getfd();
-    epoll_ctl(epfd,EPOLL_CTL_ADD,sever_sock->getfd(),&ev);
+    Epoll *ep = new Epoll();
+    ep->addFd(sever_sock->getfd(),EPOLLIN | EPOLLET);
     while(true)
     {
-        int nfds = epoll_wait(epfd,events,MAX_EVENTS,-1);
-        errif(nfds==-1,"nfd error"); 
+        std::vector<epoll_event> events = ep->poll();
+        int nfds = events.size();
         for(int i=0;i<nfds;i++)
         {
+            cout<<events[i].data.fd<<endl;
             if(events[i].data.fd == sever_sock->getfd())
             {
                 InetAddress *cliaddr = new InetAddress();
                 Socket *cli_sock = new Socket(sever_sock->accept(cliaddr));
                 cli_sock->setnoblock();
-                ev.data.fd = cli_sock->getfd();
-                ev.events = EPOLLIN | EPOLLET;
-                epoll_ctl(epfd,EPOLL_CTL_ADD,cli_sock->getfd(),&ev);
-
+                printf("new client fd %d! IP: %s Port: %d\n", cli_sock->getfd(), inet_ntoa(cliaddr->addr.sin_addr), ntohs(cliaddr->addr.sin_port));
+                ep->addFd(cli_sock->getfd(),EPOLLIN|EPOLLET);
+                
             }else if(events[i].events & EPOLLIN){
                 char buf[1024];
                 while(1)
